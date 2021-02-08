@@ -1,0 +1,838 @@
+---
+output:
+  html_document: default
+  pdf_document: default
+---
+
+### Data Cleaning
+```{r}
+library(readr)
+library(dplyr)
+library(tidyverse)
+library(randomForest)
+library(caret)
+library(ROCR)
+
+
+survey <- read_csv("survey.csv")
+
+summary(survey$Gender)
+unique(survey$Gender)
+
+survey$Gender[survey$Gender=="Female"|survey$Gender=="Woman"|survey$Gender=="female"|survey$Gender=="f"|survey$Gender=="Femake"|survey$Gender=="woman"|survey$Gender=="Cis Female"|survey$Gender=="Female (cis)"|survey$Gender=="femail"|survey$Gender=="cis-female/femme"|survey$Gender=="Trans woman"|survey$Gender=="Female (trans)"|survey$Gender=="Trans-Female"|survey$Gender=="Trans-female"]<-"F"
+
+
+survey$Gender[survey$Gender=="m"|survey$Gender=="Guy (-ish) ^_^"|survey$Gender=="Man"|survey$Gender=="Malr"|survey$Gender=="Cis Man"|survey$Gender=="Male-ish"|survey$Gender=="Cis Male"|survey$Gender=="Make"|survey$Gender=="Mail"|survey$Gender=="Male"|survey$Gender=="male"|survey$Gender=="male leaning androgynous"|survey$Gender=="Mal"|survey$Gender=="something kinda male?"|survey$Gender=="ostensibly male, unsure what that really means"|survey$Gender=="maile"|survey$Gender=="Male (CIS)"|survey$Gender=="msle"|survey$Gender=="cis male"]<-"M"
+
+survey$Gender[survey$Gender=="queer"|survey$Gender=="Agender"|survey$Gender=="Nah"|survey$Gender=="Androgyne"|survey$Gender=="fluid"|survey$Gender=="Neuter"|survey$Gender=="queer/she/they"|survey$Gender=="non-binary"|survey$Gender=="Genderqueer"|survey$Gender=="p"|survey$Gender=="All"|survey$Gender=="Agender"|survey$Gender=="Enby"|survey$Gender=="A little about you"]<-"X"
+
+unique(survey$Gender)
+#getting rid of # of employees and timestamp
+
+
+#getting rid of people who didn't put M/F
+no_x<-survey[survey$Gender!="X",]
+no_x$no_employees<-NULL
+no_x$Timestamp<-NULL
+survey
+
+#convert male to 1 female to 0
+no_x$Gender[no_x$Gender=="M"]<-1
+no_x$Gender[no_x$Gender=="F"]<-0
+
+#convert Yes saught treatment to 1 and No didn't to 0
+no_x$treatment[no_x$treatment=="Yes"]<-1
+no_x$treatment[no_x$treatment=="No"]<-0
+
+#convert family history Yes to 1 No to 0
+no_x$family_history[no_x$family_history=="Yes"]<-1
+no_x$family_history[no_x$family_history=="No"]<-0
+
+#convert self employed Yes to 1 No to 0
+no_x$self_employed[no_x$self_employed=="Yes"]<-1
+no_x$self_employed[no_x$self_employed=="No"]<-0
+
+#convert remote work Yes to 1 No to 0
+no_x$remote_work[no_x$remote_work=="Yes"]<-1
+no_x$remote_work[no_x$remote_work=="No"]<-0
+
+#convert tech company employed Yes to 1 No to 0
+no_x$tech_company[no_x$tech_company=="Yes"]<-1
+no_x$tech_company[no_x$tech_company=="No"]<-0
+
+#benefits
+no_x$benefits[no_x$benefits=="Yes"]<-1
+no_x$benefits[no_x$benefits=="No"]<-0
+no_x$benefits[no_x$benefits=="Don't know"]<-2
+
+#care options
+no_x$care_options[no_x$care_options=="Yes"]<-1
+no_x$care_options[no_x$care_options=="No"]<-0
+no_x$care_options[no_x$care_options=="Not sure"]<-2
+
+#wellness program
+no_x$wellness_program[no_x$wellness_program=="Yes"]<-1
+no_x$wellness_program[no_x$wellness_program=="No"]<-0
+no_x$wellness_program[no_x$wellness_program=="Don't know"]<-2
+
+#seek help
+no_x$seek_help[no_x$seek_help=="Yes"]<-1
+no_x$seek_help[no_x$seek_help=="No"]<-0
+no_x$seek_help[no_x$seek_help=="Don't know"]<-2
+
+#anonymity
+no_x$anonymity[no_x$anonymity=="Yes"]<-1
+no_x$anonymity[no_x$anonymity=="No"]<-0
+no_x$anonymity[no_x$anonymity=="Don't know"]<-2
+
+#mental consequence
+no_x$mental_health_consequence[no_x$mental_health_consequence=="Yes"]<-1
+no_x$mental_health_consequence[no_x$mental_health_consequence=="No"]<-0
+no_x$mental_health_consequence[no_x$mental_health_consequence=="Maybe"]<-2
+
+#phys consequence
+no_x$phys_health_consequence[no_x$phys_health_consequence=="Yes"]<-1
+no_x$phys_health_consequence[no_x$phys_health_consequence=="No"]<-0
+no_x$phys_health_consequence[no_x$phys_health_consequence=="Maybe"]<-2
+
+#supervisor
+no_x$supervisor[no_x$supervisor=="Yes"]<-1
+no_x$supervisor[no_x$supervisor=="No"]<-0
+no_x$supervisor[no_x$supervisor=="Some of them"]<-2
+
+#coworkers
+no_x$coworkers[no_x$coworkers=="Yes"]<-1
+no_x$coworkers[no_x$coworkers=="No"]<-0
+no_x$coworkers[no_x$coworkers=="Some of them"]<-2
+
+
+#mental interview
+no_x$mental_health_interview[no_x$mental_health_interview=="Yes"]<-1
+no_x$mental_health_interview[no_x$mental_health_interview=="No"]<-0
+no_x$mental_health_interview[no_x$mental_health_interview=="Maybe"]<-2
+
+#phys interview
+no_x$phys_health_interview[no_x$phys_health_interview=="Yes"]<-1
+no_x$phys_health_interview[no_x$phys_health_interview=="No"]<-0
+no_x$phys_health_interview[no_x$phys_health_interview=="Maybe"]<-2
+
+#mental vs physical
+no_x$mental_vs_physical[no_x$mental_vs_physical=="Yes"]<-1
+no_x$mental_vs_physical[no_x$mental_vs_physical=="No"]<-0
+no_x$mental_vs_physical[no_x$mental_vs_physical=="Don't know"]<-2
+
+#obs consequence
+no_x$obs_consequence[no_x$obs_consequence=="Yes"]<-1
+no_x$obs_consequence[no_x$obs_consequence=="No"]<-0
+no_x$obs_consequence[no_x$obs_consequence=="Maybe"]<-2
+
+
+```
+
+### EDA
+```{r}
+sum(no_x$treatment==1)/1246
+sum(no_x$Gender==1)/1246
+sum(no_x$remote_work==1)/1246
+sum(no_x$Gender==1)/1246
+
+sum(is.na(survey$comments))
+
+no_x$work_interfere<-NULL
+no_x$leave<-NULL
+
+#uk and us data
+uk_us<-filter(no_x,no_x$Country=="United Kingdom"|no_x$Country=="United States")
+
+#uk
+us<-filter(no_x,no_x$Country=="United States")
+
+#us
+uk<-filter(no_x,no_x$Country=="United Kingdom")
+
+#proportion who sought treatment
+sum(uk$treatment==1)/181
+sum(us$treatment==1)/746
+
+#proportion with family history
+sum(uk$family_history==1)/181
+sum(us$family_history==1)/746
+
+#proportion with remote work
+sum(uk$remote_work==1)/181
+sum(us$remote_work==1)/746
+
+#proportion with care options
+sum(uk$care_options==1)/181
+sum(us$care_options==1)/746
+
+#proportion with benefits VERY CLOSE TO HOW MANY SOUGHT TREATMENT IN THE US
+sum(uk$benefits==1)/181
+sum(us$benefits==1)/746
+
+#proportion seek help
+sum(uk$seek_help==1)/181
+sum(us$seek_help==1)/746
+
+#proportion wellness program
+sum(uk$wellness_program==1)/181
+sum(us$wellness_program==1)/746
+
+#proportion wellness program
+sum(uk$obs_consequence==1)/181
+sum(us$obs_consequence==1)/746
+
+
+mean(uk$treatment)
+mean(uk$family_history)
+
+ggplot(us)+geom_bar(aes(x=factor(benefits),fill=factor(benefits)))+xlab("Survey Response")+ylab("Number of Respondents")+labs(title="United States' responses to if their workplace offers mental health benefits",fill="Survey Response")+scale_fill_manual(values=
+                                                                                                                                                                                                                     c('red','green','yellow'),labels=
+                                                                                                                                                                                                                     c("No","Yes","Don't Know"))
+
+ggplot(uk)+geom_bar(aes(x=factor(benefits),fill=factor(benefits)))+xlab("Survey Response")+ylab("Number of Respondents")+labs(title="United Kingdoms' responses to if their workplace offers mental health benefits",fill="Survey Response")+scale_fill_manual(values=
+                                                                                                                                                                                                                                                               c('red','green','yellow'),labels=
+                                                                                                                                                                                                                                                               c("No","Yes","Don't Know"))
+
+ggplot(us)+geom_bar(aes(x=factor(care_options),fill=factor(care_options)))+xlab("Survey Response")+ylab("Number of Respondents")+labs(title="United States' responses to if they know about the care options provided by their employer",fill="Survey Response")+scale_fill_manual(values=
+                                                                                                                                                                                                                                                               c('red','green','yellow'),labels=
+                                                                                                                                                                                                                                                               c("No","Yes","Not sure"))
+
+ggplot(uk)+geom_bar(aes(x=factor(care_options),fill=factor(care_options)))+xlab("Survey Response")+ylab("Number of Respondents")+labs(title="United Kingdoms' responses to if they know about the care options provided by their employer",fill="Survey Response")+scale_fill_manual(values=
+                                                                                                                                                                                                                                                                 c('red','green','yellow'),labels=
+                                                                                                                                                                                                                                                                 c("No","Yes","Not sure"))
+ustreatment<-us[us$treatment==1,]
+uktreatment<-uk[uk$treatment==1,]
+##Plot of Gender of Survey Respondents
+ggplot(ustreatment) +geom_bar(aes(x = factor(Gender),fill=factor(Gender))) +ggtitle("Treatment Sought by Gender in the United States")+labs(fill="Gender")+xlab("Gender")+ylab("Number of Respondents")+scale_fill_manual(values=c('pink','blue'),labels=c("Female","Male"))
+
+ggplot(uktreatment) +geom_bar(aes(x = factor(Gender),fill=factor(Gender))) +ggtitle("Treatment Sought by Gender in the United Kingdom")+labs(fill="Gender")+xlab("Gender")+ylab("Number of Respondents")+scale_fill_manual(values=c('pink','blue'),labels=c("Female","Male"))
+
+
+summary(uk_us)
+
+newdf<-as.data.frame(unclass(uk_us))
+
+summary(uk_us)
+
+
+str(uk_us)
+
+
+f <- sapply(newdf, is.factor)
+f
+
+
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#install.packages('plyr')
+library(plyr)
+#install.packages('leaflet')
+library(leaflet)
+#install.packages('dplyr')
+library(dplyr)
+#install.packages('ggplot2')
+library(ggplot2)
+#install.packages('ggmap')
+library(ggmap)
+#install.packages('geojsonio')
+library(geojsonio)
+#install.packages("tidyverse")
+library(tidyverse)
+#install.packages("tidytext")
+library(tidytext)
+#install.packages("ggwordcloud")
+library(ggwordcloud)
+#install.packages("gutenbergr") 
+library(gutenbergr)
+#install.packages('textdata')
+library(textdata)
+#install.packages("textreadr")
+#library(textreadr)
+#install.packages("wordcloud")
+library(wordcloud)
+#install.packages("randomForest")
+library(randomForest)
+#install.packages('plotly')
+library(plotly)
+#install.packages('knitr')
+library(knitr)
+#install.packages("caret")
+library(caret)
+#install.packages('ROCR')
+library(ROCR)
+```
+
+
+```{r}
+# Cleaning data
+survey_data <- read.csv('survey2.csv')
+
+# getting rid of the number of employees column
+survey_data[,10] <- NULL
+
+
+# getting rid of all countries except the U.S. and U.K.
+survey_data <- survey_data[survey_data$Country == "United States" | survey_data$Country == "United Kingdom", ]
+
+
+```
+
+
+
+```{r}
+# list of U.S. states included in study
+length(unique(survey_data$state))
+# 46 states in the study
+states_and_count <- aggregate(data.frame(count = survey_data$state), list(value = survey_data$state), length)
+#View(states_and_count)
+# CA and WA are the states with the highest # of survey respondents
+usstates_and_loc <- read.csv('usstates_count.csv')
+
+
+# 6 states not included are "AK" "AR" "DE" "HI" "MT" "ND", removing those to combine two data sets
+
+
+
+# a lot of use of polygon/leaflet format coming from this webpage: https://rstudio.github.io/leaflet/choropleths.html
+
+states <- 
+    geojson_read( 
+        x = "https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json"
+        , what = "sp"
+    )
+#View(states$name)
+states$count<-usstates_and_loc$count
+#View(states)
+# leaflet map
+m <- leaflet(states) %>%
+  setView(-96, 37.8, 4) %>%
+  addTiles()
+m %>% addPolygons()
+
+bins <- c(0, 1, 10, 20, 50, 100, 200)
+pal <- colorBin("YlOrRd", domain = states$count, bins = bins)
+
+labels <- sprintf(
+  "<strong>%s</strong><br/>%g survey respondents",
+  states$name, states$count
+) %>% lapply(htmltools::HTML)
+
+m <- m %>% addPolygons(
+  fillColor = ~pal(count),
+  weight = 2,
+  opacity = 1,
+  color = "white",
+  dashArray = "3",
+  fillOpacity = 0.7,
+  highlight = highlightOptions(
+    weight = 5,
+    color = "#666",
+    dashArray = "",
+    fillOpacity = 0.7,
+    bringToFront = TRUE),
+  label = labels,
+  labelOptions = labelOptions(
+    style = list("font-weight" = "normal", padding = "3px 8px"),
+    textsize = "15px",
+    direction = "auto")
+  )
+m %>% addLegend(pal = pal, values = ~count, opacity = 0.7, title = NULL,
+  position = "bottomright")
+m
+```
+
+
+
+
+### Model Building
+```{r}
+# Cleaning data
+library(knitr)
+library(plotly)
+
+survey_data <- read.csv('survey2.csv')
+
+# getting rid of the number of employees column
+survey_data[,10] <- NULL
+
+
+# getting rid of all countries except the U.S. and U.K.
+survey_data <- survey_data[survey_data$Country == "United States" | survey_data$Country == "United Kingdom", ]
+
+
+survey_data$no_employees<-NULL
+survey_data$Timestamp<-NULL
+survey_data$comments <- NULL
+survey_data$state <- NULL
+survey_data$X <- NULL
+survey_data00 <- na.omit(survey_data)
+survey_data000<-survey_data00[which(survey_data00$Gender!="X"),]
+survey_data2 <- survey_data000[1:914,]
+
+survey_data2<-survey_data2[-c(which(survey_data2$Age<18)),]
+survey_data2<-survey_data2[-c(which(survey_data2$Age>100)),]
+
+survey_data2 <- survey_data2 %>% mutate(Age = case_when(Age>=70&Age<=79~'6',
+                                             Age>=60&Age<=69~'5',
+                                             Age>=50&Age<=59~'4',
+                                             Age >= 40  & Age <= 49 ~ '3',
+                                             Age >= 30  & Age <= 39 ~ '2',
+                                             Age >= 20  & Age <= 29 ~ '1',
+                                             Age>=10&Age<=19~'0'))
+
+survey_data2$leave[survey_data2$leave == "Very easy"] <- "Easy"
+survey_data2$leave[survey_data2$leave == "Somewhat easy"] <- "Easy"
+survey_data2$leave[survey_data2$leave == "Very difficult"] <- "Difficult"
+survey_data2$leave[survey_data2$leave == "Somewhat difficult"] <- "Difficult"
+
+#View(survey_data2)
+
+#factor(survey_data$self_employed)
+#is.factor(survey_data$Age)
+#is.factor(survey_data$self_employed)
+#survey_data$Age = col_double()
+
+
+#survey_data2[,2:22] <- lapply(survey_data2[,2:22], factor)
+#survey_data[,1] <- lapply(survey_data2[,1], double)
+
+
+factorized <- lapply(survey_data2[,2:22], factor)
+double1 <- as.factor(survey_data2$Age)
+
+library(dplyr)
+
+
+factorized$Age <- double1
+
+factorized <- as.data.frame(factorized)
+#View(factorized)
+
+#splitting to UK and US for two models
+UK_rf_input <- subset(factorized, Country == "United Kingdom")
+UK_rf_input$Country <- NULL
+US_rf_input <- subset(factorized, Country == "United States")
+US_rf_input$Country <- NULL
+
+#oversampling the UK data
+UK_rf_input<-UK_rf_input[sample(nrow(UK_rf_input),1000,replace=TRUE),]
+
+
+
+#oversampling the US data
+US_rf_input<-US_rf_input[sample(nrow(US_rf_input),1000,replace=TRUE),]
+
+
+#finding the base rate for UK and US
+sum(UK_rf_input$treatment==1)/1000
+
+
+sum(US_rf_input$treatment==1)/1000
+
+#Hypertuning the mtry parameter for the UK
+UK_rf_label<-UK_rf_input[,4]
+UK_rf_features<-UK_rf_input[,-4]
+set.seed(1950)
+#tuneRF(UK_rf_features, UK_rf_label, 4.58,ntreeTry=500, stepFactor=1, improve=0.05,trace=TRUE, plot=TRUE, doBest=FALSE)
+
+
+
+#Hypertuning the mtry parameter for the US
+US_rf_label<-US_rf_input[,4]
+US_rf_features<-US_rf_input[,-4]
+
+#tuneRF(US_rf_features, US_rf_label, 4.58,ntreeTry=500, stepFactor=1, improve=0.05,trace=TRUE, plot=TRUE, doBest=FALSE)
+
+
+UK_rf_input$treatment <- as.factor(ifelse(UK_rf_input$treatment=="No", "0", "1"))
+US_rf_input$treatment <- as.factor(ifelse(US_rf_input$treatment=="No", "0", "1"))
+# UK model
+
+# create test and train
+
+# creating sample rows for the test and train set
+sample_rows = 1:nrow(UK_rf_input)
+
+# using set seed to make results reproducible
+set.seed(1984) 
+test_rows = sample(sample_rows,
+                   dim(UK_rf_input)[1]*.10, # using 10% of dataset as test rows
+                   replace = FALSE)  # to ensure no duplicate samples
+
+# Partition the data between training and test sets 
+UK_train = UK_rf_input[-test_rows,]
+UK_test = UK_rf_input[test_rows,]
+
+# square root of predictors is 4.58 so mtry level initially will be 4.58
+set.seed(1950)    
+                        	
+UK_initial_RF = randomForest(treatment~.,      	
+                        	UK_train, 
+                        	ntree = 500,    	
+                        	mtry = 12,        
+                        	replace = TRUE, 
+                        	sampsize = 100, 
+                        	nodesize = 5,  
+                        	importance = TRUE,   
+                        	proximity = FALSE,	
+                        	norm.votes = TRUE,  
+                        	do.trace = FALSE, 	
+                        	keep.forest = TRUE,
+                        	keep.inbag = TRUE)
+
+kable(UK_initial_RF$confusion)
+UK_RF_acc = sum(UK_initial_RF$confusion[row(UK_initial_RF$confusion) == col(UK_initial_RF$confusion)]) / sum(UK_initial_RF$confusion)
+UK_RF_acc
+ukpred<-data.frame(UK_initial_RF$predicted,UK_train)
+ukpredlist<-as.list(UK_initial_RF$predicted)
+labellist<-as.list(UK_train[,4])
+
+UK_RF_2_prediction = as.data.frame(as.numeric(as.character(UK_initial_RF$votes[,2])))
+
+#View(UK_train)
+UK_train_actual = data.frame(UK_train[,4])
+
+# ROC AUC
+UK_prediction_comparison = prediction(UK_RF_2_prediction, UK_train_actual)
+
+#View(UK_prediction_comparison)
+
+# Create a performance object for ROC curve where:
+# tpr = true positive rate.
+# fpr = fale positive rate.
+UK_pred_performance = performance(UK_prediction_comparison, 
+                                         measure = "tpr",    #<- performance measure to use for the evaluation
+                                         x.measure = "fpr")  #<- 2nd performance measure to use for the evaluation
+#View(UK_pred_performance)
+
+# Here is what the performance() function does with the outputs of the
+# prediction() function.
+UK_rates = data.frame(fp = UK_prediction_comparison@fp,  #<- false positive classification.
+                             tp = UK_prediction_comparison@tp,  #<- true positive classification.
+                             tn = UK_prediction_comparison@tn,  #<- true negative classification.
+                             fn = UK_prediction_comparison@fn)  #<- false negative classification.
+
+colnames(UK_rates) = c("fp", "tp", "tn", "fn")
+
+#View(UK_rates)
+
+# As the rows go down the number of remaining unclassified items in the set decreases.
+# The first row is the starting point with the initial counts of the positive and 
+# negative value, that's why R adds an extra row to the output .
+
+# Now let's calculate the true positive and false positive rates for the classification.
+#str(UK_rates)
+tpr = UK_rates$tp / (UK_rates$tp + UK_rates$fn)
+fpr = UK_rates$fp / (UK_rates$fp + UK_rates$tn)
+
+# Compare the values with the output of the performance() function, they are the same.
+UK_rates_comparison = data.frame(UK_pred_performance@x.values,
+                                        UK_pred_performance@y.values,
+                                        fpr,
+                                        tpr)
+colnames(UK_rates_comparison) = c("x.values","y.values","fpr","tpr") #<- rename columns accordingly.
+#View(UK_rates_comparison)
+
+#dev.off() 
+while (!is.null(dev.list())) dev.off()
+
+plot(UK_pred_performance, 
+     col = "orange", 
+     lwd = 3, 
+     main = "ROC curve")
+grid(col = "black")
+
+
+# Add a 45 degree line.
+abline(a = 0, 
+       b = 1,
+       lwd = 2,
+       lty = 2,
+       col = "blue")
+
+# Calculate the area under curve (AUC), which can help you compare the 
+# ROC curves of different models for their relative accuracy.
+UK_auc_RF = performance(UK_prediction_comparison, 
+                               "auc")@y.values[[1]]
+UK_auc_RF
+
+# Add the AUC value to the ROC plot.
+text(x = 0.5, 
+     y = 0.5, 
+     labels = paste0("AUC = ", 
+                     round(UK_auc_RF,
+                           2)))
+
+kable(UK_initial_RF$confusion)
+UK_RF_acc = sum(UK_initial_RF$confusion[row(UK_initial_RF$confusion) == col(UK_initial_RF$confusion)]) / sum(UK_initial_RF$confusion)
+UK_RF_acc
+confusionMatrix(as.factor(UK_initial_RF$predicted), as.factor(UK_train$treatment), positive = "1", dnn=c("Prediction", "Actual"), mode = "everything")
+
+
+
+```
+```{r}
+#finding the error rate, hit rate 
+UK_double_original<-as.double(UK_rf_input[,4])
+UK_double_predictions<-as.double(UK_initial_RF$predicted)
+UK_residuals<-as.data.frame(UK_double_predictions-UK_double_original)
+sum(UK_double_predictions-UK_double_original)/1000
+
+
+
+```
+
+```{r}
+# most important var
+kable(as.data.frame(importance(UK_initial_RF, type = 2, scale = TRUE)))
+importance_colmn <- as.data.frame(UK_initial_RF$importance)
+#varImpPlot(UK_initial_RF,type=2)
+feat_imp_df <- importance(UK_initial_RF) %>% 
+    data.frame() %>% 
+    mutate(feature = row.names(.)) 
+
+  # plot dataframe
+  ggplot(feat_imp_df, aes(x = reorder(feature, MeanDecreaseGini), 
+                         y = MeanDecreaseGini)) +
+    geom_bar(stat='identity') +
+    coord_flip() +
+    theme_classic() +
+    labs(
+      x     = "Feature",
+      y     = "Importance",
+      title = "Mean Decrease Gini Plot U.K."
+    )
+```
+
+
+```{r}
+UK_RF_error = data.frame(1:nrow(UK_initial_RF$err.rate),
+                                UK_initial_RF$err.rate)
+
+#View(UK_RF_error)
+
+colnames(UK_RF_error) = c("Number of Trees", "OutBoxerror",
+                                 "No", "Yes")
+
+# Add another variable that measures the difference between the error rates, in
+# some situations we would want to minimize this but need to use caution because
+# it could be that the differences are small but that both errors are really high,
+# just another point to track. 
+
+UK_RF_error$Diff <- UK_RF_error$Yes-UK_RF_error$No
+
+
+fig_UK <- plot_ly(x = UK_RF_error$`Number of Trees`, y=UK_RF_error$Diff,name="Diff", type = 'scatter', mode = 'lines')
+fig_UK <- fig_UK %>% add_trace(y=UK_RF_error$OutBoxerror, name="O.O.B error")
+fig_UK <- fig_UK %>% add_trace(y=UK_RF_error$No, name="No")
+fig_UK <- fig_UK %>% add_trace(y=UK_RF_error$Yes, name="Yes")
+
+fig_UK
+
+# OOB error converges to 0.4
+#classifying sought treatment better than not
+kable(UK_initial_RF$confusion)
+UK_RF_acc = sum(UK_initial_RF$confusion[row(UK_initial_RF$confusion) == col(UK_initial_RF$confusion)]) / sum(UK_initial_RF$confusion)
+UK_RF_acc
+
+kable(head(UK_RF_error[order(UK_RF_error$OutBoxerror, decreasing = FALSE),], n=5))
+# the minimum out of the box error is 0.1555707, the minimum number of trees at this min out of box error is 282
+
+```
+
+
+
+
+
+```{r}
+# creating sample rows for the test and train set
+sample_rows = 1:nrow(US_rf_input)
+
+# using set seed to make results reproducible
+set.seed(1984) 
+test_rows = sample(sample_rows,
+                   dim(US_rf_input)[1]*.10, # using 30% of dataset as test rows
+                   replace = FALSE)  # to ensure no duplicate samples
+
+# Partition the data between training and test sets 
+US_train = US_rf_input[-test_rows,]
+US_test = US_rf_input[test_rows,]
+
+# square root of predictors is 4.58 so mtry level initially will be 4.58
+set.seed(1950)    
+                        	
+US_initial_RF = randomForest(treatment~.,      	
+                        	US_train, 
+                        	ntree = 500,    	
+                        	mtry = 15,        
+                        	replace = TRUE, 
+                        	sampsize = 100, 
+                        	nodesize = 5,  
+                        	importance = TRUE,   
+                        	proximity = FALSE,	
+                        	norm.votes = TRUE,  
+                        	do.trace = FALSE, 	
+                        	keep.forest = TRUE,
+                        	keep.inbag = TRUE)
+kable(US_initial_RF$confusion)
+US_RF_acc = sum(US_initial_RF$confusion[row(US_initial_RF$confusion) == col(US_initial_RF$confusion)]) / sum(US_initial_RF$confusion)
+US_RF_acc
+
+US_RF_2_prediction = as.data.frame(as.numeric(as.character(US_initial_RF$votes[,2])))
+
+#View(UK_train)
+US_train_actual = data.frame(US_train[,4])
+
+# ROC AUC
+US_prediction_comparison = prediction(US_RF_2_prediction, US_train_actual)
+
+#View(UK_prediction_comparison)
+
+# Create a performance object for ROC curve where:
+# tpr = true positive rate.
+# fpr = fale positive rate.
+US_pred_performance = performance(US_prediction_comparison, 
+                                         measure = "tpr",    #<- performance measure to use for the evaluation
+                                         x.measure = "fpr")  #<- 2nd performance measure to use for the evaluation
+#View(UK_pred_performance)
+
+# Here is what the performance() function does with the outputs of the
+# prediction() function.
+US_rates = data.frame(fp = US_prediction_comparison@fp,  #<- false positive classification.
+                             tp = US_prediction_comparison@tp,  #<- true positive classification.
+                             tn = US_prediction_comparison@tn,  #<- true negative classification.
+                             fn = US_prediction_comparison@fn)  #<- false negative classification.
+
+colnames(US_rates) = c("fp", "tp", "tn", "fn")
+
+#View(UK_rates)
+
+# As the rows go down the number of remaining unclassified items in the set decreases.
+# The first row is the starting point with the initial counts of the positive and 
+# negative value, that's why R adds an extra row to the output .
+
+# Now let's calculate the true positive and false positive rates for the classification.
+#str(UK_rates)
+tpr = US_rates$tp / (US_rates$tp + US_rates$fn)
+fpr = US_rates$fp / (US_rates$fp + US_rates$tn)
+
+# Compare the values with the output of the performance() function, they are the same.
+US_rates_comparison = data.frame(US_pred_performance@x.values,
+                                        US_pred_performance@y.values,
+                                        fpr,
+                                        tpr)
+colnames(US_rates_comparison) = c("x.values","y.values","fpr","tpr") #<- rename columns accordingly.
+#View(UK_rates_comparison)
+
+#dev.off() 
+while (!is.null(dev.list())) dev.off()
+
+plot(US_pred_performance, 
+     col = "orange", 
+     lwd = 3, 
+     main = "ROC curve")
+grid(col = "black")
+
+
+# Add a 45 degree line.
+abline(a = 0, 
+       b = 1,
+       lwd = 2,
+       lty = 2,
+       col = "blue")
+
+# Calculate the area under curve (AUC), which can help you compare the 
+# ROC curves of different models for their relative accuracy.
+US_auc_RF = performance(US_prediction_comparison, 
+                               "auc")@y.values[[1]]
+US_auc_RF
+
+# Add the AUC value to the ROC plot.
+text(x = 0.5, 
+     y = 0.5, 
+     labels = paste0("AUC = ", 
+                     round(US_auc_RF,
+                           2)))
+
+```
+```{r}
+#finding the error rate, hit rate 
+US_double_original<-as.double(US_rf_input[,4])
+US_double_predictions<-as.double(US_initial_RF$predicted)
+US_residuals<-as.data.frame(ifelse(US_double_predictions-US_double_original==0,0,1))
+1-sum(US_residuals)/1000
+
+sum(US_residuals==0)
+
+UK_double_original<-as.double(UK_rf_input[,4])
+UK_double_predictions<-as.double(UK_initial_RF$predicted)
+UK_residuals<-as.data.frame(ifelse(UK_double_predictions-UK_double_original==0,0,1))
+1-sum(UK_residuals)/1000
+
+sum(UK_residuals==0)
+
+```
+
+```{r}
+# most important var
+kable(as.data.frame(importance(US_initial_RF, type = 2, scale = TRUE)))
+importance_colmn <- as.data.frame(US_initial_RF$importance)
+#varImpPlot(US_initial_RF,type=2)
+feat_imp_df <- importance(US_initial_RF) %>% 
+    data.frame() %>% 
+    mutate(feature = row.names(.)) 
+
+  # plot dataframe
+  ggplot(feat_imp_df, aes(x = reorder(feature, MeanDecreaseGini), 
+                         y = MeanDecreaseGini)) +
+    geom_bar(stat='identity') +
+    coord_flip() +
+    theme_classic() +
+    labs(
+      x     = "Feature",
+      y     = "Importance",
+      title = "Mean Decrease Gini Plot U.S."
+    )
+```
+```{r}
+US_RF_error = data.frame(1:nrow(US_initial_RF$err.rate),
+                                US_initial_RF$err.rate)
+
+#View(UK_RF_error)
+
+colnames(US_RF_error) = c("Number of Trees", "OutBoxerror",
+                                 "No", "Yes")
+
+# Add another variable that measures the difference between the error rates, in
+# some situations we would want to minimize this but need to use caution because
+# it could be that the differences are small but that both errors are really high,
+# just another point to track. 
+
+US_RF_error$Diff <- US_RF_error$Yes-US_RF_error$No
+
+
+fig_US <- plot_ly(x = US_RF_error$`Number of Trees`, y=US_RF_error$Diff,name="Diff", type = 'scatter', mode = 'lines')
+fig_US <- fig_US %>% add_trace(y=US_RF_error$OutBoxerror, name="O.O.B error")
+fig_US <- fig_US %>% add_trace(y=US_RF_error$No, name="No")
+fig_US <- fig_US %>% add_trace(y=US_RF_error$Yes, name="Yes")
+
+fig_US
+
+kable(US_initial_RF$confusion)
+US_RF_acc = sum(US_initial_RF$confusion[row(US_initial_RF$confusion) == col(US_initial_RF$confusion)]) / sum(US_initial_RF$confusion)
+US_RF_acc
+confusionMatrix(as.factor(US_initial_RF$predicted), as.factor(US_train$treatment), positive = "1", dnn=c("Prediction", "Actual"), mode = "everything")
+
+
+kable(head(US_RF_error[order(US_RF_error$OutBoxerror, decreasing = FALSE),], n=5))
+# the minimum out of the box error is 0.1555707, the minimum number of trees at this min out of box error is 282
+
+```
+### Model Comparison
+```{r}
+prop.test(x = c(506,514), n = c(1000, 1000),
+           alternative = "two.sided",correct=FALSE)
+```
